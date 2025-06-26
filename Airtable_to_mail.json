@@ -1,0 +1,185 @@
+{
+  "name": "Airtable to mail",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "authentication": "airtableTokenApi",
+        "baseId": {
+          "__rl": true,
+          "value": "https://airtable.com/appunqLQApfME06ET/tbl2NULeHyfGtLwIc/viwEvM7C2u19DafWZ?blocks=hide",
+          "mode": "url"
+        },
+        "tableId": {
+          "__rl": true,
+          "value": "https://airtable.com/appunqLQApfME06ET/tbl2NULeHyfGtLwIc/viwEvM7C2u19DafWZ?blocks=hide",
+          "mode": "url"
+        },
+        "triggerField": "Name",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -80
+      ],
+      "id": "61bfb73d-8689-47ce-ab04-e76ab6316af5",
+      "name": "Airtable Trigger",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "zTqErV5G03t8fUFO",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Send an email once a new data is added to airtable in the previous node.\nuse the following format\nSubject,\ngreeting,\nconstruct a code email of 100 words as the body",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a helpful AI assistant. You are responsible for human resources data organisation for the details of the new employees. Your main task is to send an email if any employee name is added to airtable"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        -140,
+        -120
+      ],
+      "id": "08f775e0-e237-49a8-9266-72167f1c093b",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxTokensToSample": 500,
+          "temperature": 0.5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        140
+      ],
+      "id": "a786e421-b9d8-4c51-ab6e-503cec7c7cb6",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "yhW6DzXPsNDPbXan",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "eomobamidele@gmail.com",
+        "subject": "Notice New Employee Added to Airtable",
+        "emailType": "text",
+        "message": "=Dear Human Resources, \n\nWe just added a new employee",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        260,
+        -80
+      ],
+      "id": "f44205c3-7b5e-4fb3-9589-2c65cbb2d401",
+      "name": "Gmail",
+      "webhookId": "5c1962db-c9cf-4cff-bbbe-f317a3d99496",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PlrQsDawc6tU03XN",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "separator": "\\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserItemList",
+      "typeVersion": 1,
+      "position": [
+        100,
+        100
+      ],
+      "id": "3c978883-2455-47f6-99ff-07927729435e",
+      "name": "Item List Output Parser"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Airtable Trigger": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item List Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "050948b2-28d0-4698-ac4a-f95750f96890",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4a9883a9b69aa487df334e3f817f52000512e89c763a5980318f4e0679f30fa9"
+  },
+  "id": "3SCh8aRzLVTo8JLS",
+  "tags": []
+}
