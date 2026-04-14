@@ -1,0 +1,711 @@
+{
+  "name": "hr_ats_pieline",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "d7e9849d-15bb-46fc-b819-e8bce162dc3e",
+        "formTitle": "HR Recruitment - Candidate Application",
+        "formDescription": "Submit your biodata and CV for evaluation. PDF format required.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "First name",
+              "placeholder": "firstname"
+            },
+            {
+              "fieldLabel": "Last name",
+              "placeholder": "last name"
+            },
+            {
+              "fieldLabel": "years of experience",
+              "fieldType": "number"
+            },
+            {
+              "fieldLabel": "Add your cv",
+              "fieldType": "file",
+              "acceptFileTypes": ".pdf"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6457a029-8a6a-411a-b843-3cea970d4bb1",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        -1632,
+        288
+      ],
+      "webhookId": "d7e9849d-15bb-46fc-b819-e8bce162dc3e"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "id": "6c30d468-6077-49fa-8af4-5c12a7147b1e",
+      "name": "Extract From PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -1296,
+        288
+      ],
+      "notesInFlow": true,
+      "onError": "continueErrorOutput",
+      "notes": "Assumes Form Trigger outputs the uploaded file in binary.data. If your instance uses a different binary name, update binaryPropertyName."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "resume_text",
+              "value": "={{ $json.text ?? $json.data ?? $json }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "email",
+              "value": "={{ $('Form Trigger').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "phone",
+              "value": "={{ $('Form Trigger').item.json.phone ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "job_code",
+              "value": "={{ $('Form Trigger').item.json.job_code }}",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "requirements_source",
+              "value": "={{ $('Form Trigger').item.json.requirements_source ?? 'rdbms' }}",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "form_biodata",
+              "value": "={{ $('Form Trigger').item.json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b10e5bfc-6372-44b8-8546-6efcdf2f73c1",
+      "name": "Prepare Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1008,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are an information extraction engine. Given the full text of a candidate's resume, extract the candidate's full name EXACTLY as written in the resume header. Return ONLY valid JSON in this exact format: {\"full_name_from_cv\": \"...\"}",
+              "role": "system"
+            },
+            {
+              "content": "=Resume text:\n{{ $json.resume_text }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "dcaac5f0-651e-4a2f-baba-333ea3eb47f8",
+      "name": "Extract Name from CV",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.7,
+      "position": [
+        -736,
+        272
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "1GyN5rfWeMPu2ejr",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "full_name_from_cv",
+              "value": "={{ (typeof $json.message?.content === 'string' ? JSON.parse($json.message?.content?.replace(/```json\\n?|```/g, '') || '{}') : $json)?.full_name_from_cv ?? $json.message?.content ?? 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "b2",
+              "name": "resume_text",
+              "value": "={{ $('Prepare Data').item.json.resume_text }}",
+              "type": "string"
+            },
+            {
+              "id": "b3",
+              "name": "email",
+              "value": "={{ $('Prepare Data').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "b4",
+              "name": "phone",
+              "value": "={{ $('Prepare Data').item.json.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "b5",
+              "name": "job_code",
+              "value": "={{ $('Prepare Data').item.json.job_code }}",
+              "type": "string"
+            },
+            {
+              "id": "b6",
+              "name": "requirements_source",
+              "value": "={{ $('Prepare Data').item.json.requirements_source }}",
+              "type": "string"
+            },
+            {
+              "id": "b7",
+              "name": "form_biodata",
+              "value": "={{ $('Prepare Data').item.json.form_biodata }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3d76c8e8-6341-428f-8c1c-6d2a448ce886",
+      "name": "Parse Extracted Name",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -368,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "schema": "public",
+        "table": "candidates",
+        "columns": {
+          "0": "f",
+          "1": "u",
+          "2": "l",
+          "3": "l",
+          "4": "_",
+          "5": "n",
+          "6": "a",
+          "7": "m",
+          "8": "e",
+          "9": ",",
+          "10": " ",
+          "11": "e",
+          "12": "m",
+          "13": "a",
+          "14": "i",
+          "15": "l",
+          "16": ",",
+          "17": " ",
+          "18": "p",
+          "19": "h",
+          "20": "o",
+          "21": "n",
+          "22": "e",
+          "23": ",",
+          "24": " ",
+          "25": "j",
+          "26": "o",
+          "27": "b",
+          "28": "_",
+          "29": "c",
+          "30": "o",
+          "31": "d",
+          "32": "e",
+          "33": ",",
+          "34": " ",
+          "35": "f",
+          "36": "o",
+          "37": "r",
+          "38": "m",
+          "39": "_",
+          "40": "b",
+          "41": "i",
+          "42": "o",
+          "43": "d",
+          "44": "a",
+          "45": "t",
+          "46": "a",
+          "47": ",",
+          "48": " ",
+          "49": "r",
+          "50": "e",
+          "51": "s",
+          "52": "u",
+          "53": "m",
+          "54": "e",
+          "55": "_",
+          "56": "t",
+          "57": "e",
+          "58": "x",
+          "59": "t",
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "11f8a4cc-8125-45c6-ba57-4bfed68057ed",
+      "name": "Save Candidate to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -112,
+        272
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "cmxNeCiKvlqkk0Eh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.requirements_source }}",
+              "rightValue": "rdbms",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "088cf687-da93-46d9-8b11-cf35335446ac",
+      "name": "Requirements Source?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        144,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT requirements_text, title FROM job_requirements WHERE job_code = '{{ $json.job_code }}' LIMIT 1",
+        "options": {}
+      },
+      "id": "0812ab60-904b-4f1a-9bc1-efa9b04d080a",
+      "name": "Get Job Requirements (RDBMS)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        384,
+        144
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "cmxNeCiKvlqkk0Eh",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "requirements_text",
+              "value": "={{ $json.requirements_text ?? 'No requirements found for this job code.' }}",
+              "type": "string"
+            },
+            {
+              "id": "d2",
+              "name": "job_title",
+              "value": "={{ $json.title ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6a6a7b95-ae95-4466-a1ed-2547e959977f",
+      "name": "Format RDBMS Requirements",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        592,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "requirements_text",
+              "value": "Configure a Vector Store Retriever node to fetch job requirements by job_code. Connect Qdrant/Pinecone/Supabase Vector and query with: {{ $json.job_code }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5db9009d-d520-48e8-87f2-55f18e82311f",
+      "name": "Get Requirements (Vector DB)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        384
+      ],
+      "notesInFlow": true,
+      "notes": "Replace with Qdrant/Pinecone Vector Store Retriever - query by job_code, return requirements document"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "id": "5cf4d0d6-f8dc-4a81-8a13-a79c83270c0d",
+      "name": "Merge Requirements",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        768,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "candidate_id",
+              "value": "={{ $('Save Candidate to PostgreSQL').item.json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "f2",
+              "name": "full_name_from_cv",
+              "value": "={{ $('Parse Extracted Name').item.json.full_name_from_cv }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "resume_text",
+              "value": "={{ $('Parse Extracted Name').item.json.resume_text }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "job_code",
+              "value": "={{ $('Parse Extracted Name').item.json.job_code }}",
+              "type": "string"
+            },
+            {
+              "id": "f5",
+              "name": "requirements_text",
+              "value": "={{ $json.requirements_text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ace7d96e-1a69-4447-8115-d96f2967c65c",
+      "name": "Prepare ATS Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "cdc0ec49-0b37-4bf7-b549-4c67d6349f51",
+      "name": "AI ATS Evaluation",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.7,
+      "position": [
+        1216,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "1GyN5rfWeMPu2ejr",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nlet parsed = {};\ntry {\n  const content = raw.message?.content ?? raw.text ?? JSON.stringify(raw);\n  const cleaned = String(content).replace(/```json\\n?|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { ats_score: 0, recommended: false, summary: 'Parse error', key_skills: [], ats_keywords: [] };\n}\nconst prev = $('Prepare ATS Input').first().json;\nreturn {\n  json: {\n    candidate_id: prev.candidate_id,\n    job_code: prev.job_code,\n    ats_score: parsed.ats_score ?? 0,\n    is_recommended: parsed.recommended ?? false,\n    key_skills: parsed.key_skills ?? [],\n    ats_keywords: parsed.ats_keywords ?? [],\n    evaluation_summary: parsed.summary ?? '',\n    raw_model_response: parsed\n  }\n};"
+      },
+      "id": "54c0a4d2-8f79-4f28-9838-e5d5f09a5c31",
+      "name": "Parse ATS Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "schema": "public",
+        "table": "candidate_evaluations",
+        "columns": "candidate_id, job_code, ats_score, is_recommended, key_skills, ats_keywords, evaluation_summary, raw_model_response",
+        "options": {}
+      },
+      "id": "62aa479c-6a9b-4fed-802c-58b9ff8fd72b",
+      "name": "Save Evaluation to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1824,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "cmxNeCiKvlqkk0Eh",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract From PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From PDF": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data": {
+      "main": [
+        [
+          {
+            "node": "Extract Name from CV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Name from CV": {
+      "main": [
+        [
+          {
+            "node": "Parse Extracted Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Extracted Name": {
+      "main": [
+        [
+          {
+            "node": "Save Candidate to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Candidate to PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Requirements Source?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requirements Source?": {
+      "main": [
+        [
+          {
+            "node": "Get Job Requirements (RDBMS)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Requirements (Vector DB)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Job Requirements (RDBMS)": {
+      "main": [
+        [
+          {
+            "node": "Format RDBMS Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format RDBMS Requirements": {
+      "main": [
+        [
+          {
+            "node": "Merge Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Requirements (Vector DB)": {
+      "main": [
+        [
+          {
+            "node": "Merge Requirements",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Requirements": {
+      "main": [
+        [
+          {
+            "node": "Prepare ATS Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare ATS Input": {
+      "main": [
+        [
+          {
+            "node": "AI ATS Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI ATS Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Parse ATS Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse ATS Output": {
+      "main": [
+        [
+          {
+            "node": "Save Evaluation to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8e674d0d-cf6d-4cb8-b726-2a343f66f046",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1e4cc33c14f6949fca0e65dc29657870517da4f4a86d200511204cd433337293"
+  },
+  "id": "RIxMQOlqrkdv2MxL",
+  "tags": []
+}
