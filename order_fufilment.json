@@ -1,0 +1,371 @@
+{
+  "name": "order_fufilment",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF Verified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        80
+      ],
+      "id": "6e2f1a58-6e37-4f58-b710-6f87f6cfaf2a"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"invalid\", \"reason\": $json.reason } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Respond 401 (Invalid)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        336
+      ],
+      "id": "14ec3890-aa4f-47e4-ba6d-03ec984f5e00"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"received\" } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Respond 200 (OK)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        -128
+      ],
+      "id": "b0901428-4e3e-4de8-8c76-895b59d7f863"
+    },
+    {
+      "parameters": {
+        "content": "## Idempotency check (fill in)\nBefore doing any fulfillment below, look up `reference` in Sheets/Airtable/Postgres. If it already exists, stop here  Paystack retries webhooks and you'll otherwise double-enroll people.",
+        "height": 188,
+        "width": 668
+      },
+      "name": "Sticky: Idempotency",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        -208
+      ],
+      "id": "092aeb91-3a0d-4f37-8092-ffe61ea03b6c"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "paystack-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "name": "paystack",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        80
+      ],
+      "webhookId": "paystack-webhook",
+      "id": "e4694d3b-cc32-4431-9aea-0e70217086ee"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        -288
+      ],
+      "id": "e1c5c27e-0810-46f2-9b83-6f4fe9f7c6c8",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "permissionsUi": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        304,
+        -96
+      ],
+      "id": "fa02dad9-d3a0-4d7b-a311-45a841ac4066",
+      "name": "Share file"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        192
+      ],
+      "id": "b14eae4b-c3ae-4df2-82fb-4faa6a85e88e",
+      "name": "Send a message",
+      "webhookId": "0cfee842-1b03-4446-8189-f3ec4b480503",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4Y0ohbDt2i3LEbkV",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        112,
+        48
+      ],
+      "id": "9a1d6eaa-94ad-43b5-8725-79b135500adb",
+      "name": "map_email"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const crypto = require('crypto');\n// Store this in n8n credentials or Settings > Environment Variables — never hardcode it\nconst secret = \"sk_live_c4c7664042cea2f7b46d84957107f48e9a4d2e3e\";\n// Requires \"Raw Body\" enabled in the Webhook node's Options (already set above).\n// With raw body on, n8n gives you the unparsed string in json.body instead of a parsed object.\nconst rawBody = $input.item.json.body;\nconst signature = $input.item.json.headers['x-paystack-signature'];\nif (!secret) {\n  return [{ json: { verified: false, reason: 'missing_secret' } }];\n}\nif (!rawBody || !signature) {\n  return [{ json: { verified: false, reason: 'missing_body_or_signature' } }];\n}\nconst expectedHash = crypto\n  .createHmac('sha512', secret)\n  .update(rawBody)\n  .digest('hex');\nconst isValidSignature = expectedHash === signature;\nlet payload;\ntry {\n  payload = JSON.parse(rawBody);\n} catch (e) {\n  return [{ json: { verified: false, reason: 'invalid_json' } }];\n}\nconst isChargeSuccess = payload.event === 'charge.success';\n// Set the expected price in kobo (NGN smallest unit). e.g. ₦50,000 = 5000000 but 500 is used to test response\nconst expectedAmount = 500;\nconst isAmountCorrect = payload.data && payload.data.amount === expectedAmount;\nreturn [{\n  json: {\n    verified: isValidSignature && isChargeSuccess && isAmountCorrect,\n    reference: payload.data ? payload.data.reference : null,\n    email: payload.data && payload.data.customer ? payload.data.customer.email : null,\n    amount: payload.data ? payload.data.amount : null,\n    reason: !isValidSignature ? 'bad_signature' : !isChargeSuccess ? 'wrong_event' : !isAmountCorrect ? 'amount_mismatch' : 'ok'\n  }\n}];"
+      },
+      "name": "pass_resp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        80
+      ],
+      "id": "af20b865-d511-456b-9e94-94607f4e6505"
+    }
+  ],
+  "pinData": {
+    "paystack": [
+      {
+        "json": {
+          "headers": {
+            "connection": "upgrade",
+            "host": "n8ndev.dedamdata.org",
+            "x-real-ip": "52.214.14.220",
+            "x-forwarded-for": "52.214.14.220",
+            "x-forwarded-proto": "https",
+            "content-length": "1518",
+            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json",
+            "user-agent": "Paystack/2.0",
+            "x-paystack-integration-id": "1909979",
+            "x-paystack-signature": "f2c4314b1aa69c3e2a5d4b166c9020f56215b64715d55ec5b73332bf28ae76dabca164181a74d3038404073faff82217231c3098871e2d375c5582b30f456b10"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "event": "charge.success",
+            "data": {
+              "id": 6345928514,
+              "domain": "live",
+              "status": "success",
+              "reference": "T580459707280382",
+              "amount": 10000,
+              "message": null,
+              "gateway_response": "Approved",
+              "paid_at": "2026-07-10T18:27:13.000Z",
+              "created_at": "2026-07-10T18:26:15.000Z",
+              "channel": "bank_transfer",
+              "currency": "NGN",
+              "ip_address": "102.67.5.4",
+              "metadata": {
+                "referrer": "https://paystack.shop/pay/us-payment"
+              },
+              "fees_breakdown": {
+                "amount": 150,
+                "formula": null,
+                "type": "paystack"
+              },
+              "log": null,
+              "fees": 150,
+              "fees_split": null,
+              "authorization": {
+                "authorization_code": "AUTH_v0lab4gvwg",
+                "bin": "814XXX",
+                "last4": "X008",
+                "exp_month": "07",
+                "exp_year": "2026",
+                "channel": "bank_transfer",
+                "card_type": "transfer",
+                "bank": "PalmPay",
+                "country_code": "NG",
+                "brand": "Managed Account",
+                "reusable": false,
+                "signature": null,
+                "account_name": null,
+                "sender_country": "NG",
+                "sender_bank": "PalmPay",
+                "sender_bank_account_number": "XXXXXXX008",
+                "sender_name": "EZEKIEL OMOBAMIDELE  SANMABO",
+                "narration": "EZEKIEL OMOBAMIDELE  SANMABO:8141689008",
+                "receiver_bank_account_number": "9983311128",
+                "receiver_bank": "Paystack-Titan"
+              },
+              "customer": {
+                "id": 381692147,
+                "first_name": "Omobamidele",
+                "last_name": "Sanmabo",
+                "email": "ezekiel.sanmabo@dedamdata.org",
+                "customer_code": "CUS_zyns3caq5ohazjg",
+                "phone": "",
+                "metadata": null,
+                "risk_action": "default",
+                "international_format_phone": null
+              },
+              "plan": {},
+              "subaccount": {},
+              "split": {},
+              "order_id": null,
+              "paidAt": "2026-07-10T18:27:13.000Z",
+              "requested_amount": 10000,
+              "pos_transaction_data": null,
+              "source": {
+                "type": "web",
+                "source": "checkout",
+                "entry_point": "request_inline",
+                "identifier": null
+              }
+            }
+          },
+          "webhookUrl": "https://n8ndev.dedamdata.org/webhook-test/paystack-webhook",
+          "executionMode": "test"
+        },
+        "binary": {
+          "data": {
+            "data": "eyJldmVudCI6ImNoYXJnZS5zdWNjZXNzIiwiZGF0YSI6eyJpZCI6NjM0NTkyODUxNCwiZG9tYWluIjoibGl2ZSIsInN0YXR1cyI6InN1Y2Nlc3MiLCJyZWZlcmVuY2UiOiJUNTgwNDU5NzA3MjgwMzgyIiwiYW1vdW50IjoxMDAwMCwibWVzc2FnZSI6bnVsbCwiZ2F0ZXdheV9yZXNwb25zZSI6IkFwcHJvdmVkIiwicGFpZF9hdCI6IjIwMjYtMDctMTBUMTg6Mjc6MTMuMDAwWiIsImNyZWF0ZWRfYXQiOiIyMDI2LTA3LTEwVDE4OjI2OjE1LjAwMFoiLCJjaGFubmVsIjoiYmFua190cmFuc2ZlciIsImN1cnJlbmN5IjoiTkdOIiwiaXBfYWRkcmVzcyI6IjEwMi42Ny41LjQiLCJtZXRhZGF0YSI6eyJyZWZlcnJlciI6Imh0dHBzOi8vcGF5c3RhY2suc2hvcC9wYXkvdXMtcGF5bWVudCJ9LCJmZWVzX2JyZWFrZG93biI6eyJhbW91bnQiOjE1MCwiZm9ybXVsYSI6bnVsbCwidHlwZSI6InBheXN0YWNrIn0sImxvZyI6bnVsbCwiZmVlcyI6MTUwLCJmZWVzX3NwbGl0IjpudWxsLCJhdXRob3JpemF0aW9uIjp7ImF1dGhvcml6YXRpb25fY29kZSI6IkFVVEhfdjBsYWI0Z3Z3ZyIsImJpbiI6IjgxNFhYWCIsImxhc3Q0IjoiWDAwOCIsImV4cF9tb250aCI6IjA3IiwiZXhwX3llYXIiOiIyMDI2IiwiY2hhbm5lbCI6ImJhbmtfdHJhbnNmZXIiLCJjYXJkX3R5cGUiOiJ0cmFuc2ZlciIsImJhbmsiOiJQYWxtUGF5IiwiY291bnRyeV9jb2RlIjoiTkciLCJicmFuZCI6Ik1hbmFnZWQgQWNjb3VudCIsInJldXNhYmxlIjpmYWxzZSwic2lnbmF0dXJlIjpudWxsLCJhY2NvdW50X25hbWUiOm51bGwsInNlbmRlcl9jb3VudHJ5IjoiTkciLCJzZW5kZXJfYmFuayI6IlBhbG1QYXkiLCJzZW5kZXJfYmFua19hY2NvdW50X251bWJlciI6IlhYWFhYWFgwMDgiLCJzZW5kZXJfbmFtZSI6IkVaRUtJRUwgT01PQkFNSURFTEUgIFNBTk1BQk8iLCJuYXJyYXRpb24iOiJFWkVLSUVMIE9NT0JBTUlERUxFICBTQU5NQUJPOjgxNDE2ODkwMDgiLCJyZWNlaXZlcl9iYW5rX2FjY291bnRfbnVtYmVyIjoiOTk4MzMxMTEyOCIsInJlY2VpdmVyX2JhbmsiOiJQYXlzdGFjay1UaXRhbiJ9LCJjdXN0b21lciI6eyJpZCI6MzgxNjkyMTQ3LCJmaXJzdF9uYW1lIjoiT21vYmFtaWRlbGUiLCJsYXN0X25hbWUiOiJTYW5tYWJvIiwiZW1haWwiOiJlemVraWVsLnNhbm1hYm9AZGVkYW1kYXRhLm9yZyIsImN1c3RvbWVyX2NvZGUiOiJDVVNfenluczNjYXE1b2hhempnIiwicGhvbmUiOiIiLCJtZXRhZGF0YSI6bnVsbCwicmlza19hY3Rpb24iOiJkZWZhdWx0IiwiaW50ZXJuYXRpb25hbF9mb3JtYXRfcGhvbmUiOm51bGx9LCJwbGFuIjp7fSwic3ViYWNjb3VudCI6e30sInNwbGl0Ijp7fSwib3JkZXJfaWQiOm51bGwsInBhaWRBdCI6IjIwMjYtMDctMTBUMTg6Mjc6MTMuMDAwWiIsInJlcXVlc3RlZF9hbW91bnQiOjEwMDAwLCJwb3NfdHJhbnNhY3Rpb25fZGF0YSI6bnVsbCwic291cmNlIjp7InR5cGUiOiJ3ZWIiLCJzb3VyY2UiOiJjaGVja291dCIsImVudHJ5X3BvaW50IjoicmVxdWVzdF9pbmxpbmUiLCJpZGVudGlmaWVyIjpudWxsfX19",
+            "mimeType": "application/json"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "IF Verified": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (OK)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401 (Invalid)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 (OK)": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "map_email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "paystack": {
+      "main": [
+        [
+          {
+            "node": "pass_resp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "map_email": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "pass_resp": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "3950a2fe-bf27-4b17-b9da-44536ad8798d",
+  "meta": {
+    "instanceId": "954c6568a74abc2fc743f2eea4e4ed1b456136ec44f7fc57a2c6b805a9f0a3eb"
+  },
+  "id": "pKARCNU57r8r7Y0u",
+  "tags": []
+}
