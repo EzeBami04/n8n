@@ -10,6 +10,6 @@ The following are list of major projects featured in this repo
 ![image](utils/bootcamp.jpg)
 
 - RAG chatbots trained for difference disciplines
-
-![image](utils/secup.jpg)
+- Course fufilment workflow for online bootcamp integrating paystack webhooks, git and google sheets
+![image](utils/course_fufil.jpg)
 ###
