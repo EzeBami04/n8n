@@ -12,4 +12,7 @@ The following are list of major projects featured in this repo
 - RAG chatbots trained for difference disciplines
 - Course fufilment workflow for online bootcamp integrating paystack webhooks, git and google sheets
 ![image](utils/course_fufil.jpg)
+
+- AI auto followup workflow
+- ![image](utils/auto_follow_up.jpg)
 ###
