@@ -200,7 +200,7 @@
             "content-type": "application/json",
             "user-agent": "Paystack/2.0",
             "x-paystack-integration-id": "1909979",
-            "x-paystack-signature": "f2c4314b1aa69c3e2a5d4b166c9020f56215b64715d55ec5b73332bf28ae76dabca164181a74d3038404073faff82217231c3098871e2d375c5582b30f456b10"
+            "x-paystack-signature": {{ $vars.paystack }}
           },
           "params": {},
           "query": {},
