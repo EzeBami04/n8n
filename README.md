@@ -6,7 +6,7 @@ The following are list of major projects featured in this repo
 - HR recruitement workflow automation project
 - Telegram Agent integrating websearch, facebook, youtube, mails and calendar
 
-- Bootcamp signup page automation backend
+- Bootcamp signup page automation
 ![image](utils/bootcamp.jpg)
 
 - RAG chatbots trained for difference disciplines
@@ -15,4 +15,7 @@ The following are list of major projects featured in this repo
 
 - AI auto followup workflow
 - ![image](utils/auto_follow_up.jpg)
+
+- integrate n8n with Git and git CI CD
+- - ![image](utils/monster.jpg)
 ###
